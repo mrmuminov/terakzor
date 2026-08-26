@@ -151,6 +151,15 @@ fn resolve_config_candidates() -> Vec<std::path::PathBuf> {
     candidates
 }
 
+fn config_env_value(value: Option<std::ffi::OsString>) -> stoolap::Result<Option<String>> {
+    match value {
+        None => Ok(None),
+        Some(value) => value.into_string().map(Some).map_err(|_| {
+            stoolap::Error::internal("TERAKZOR_CONFIG must contain a valid UTF-8 path")
+        }),
+    }
+}
+
 fn find_config_path(
     cli_arg: Option<&str>,
     env_var: Option<&str>,
@@ -303,7 +312,7 @@ async fn main() -> stoolap::Result<()> {
     let cli_config = parse_config_arg(&args).map_err(stoolap::Error::internal)?;
 
     // Resolve which config file to use
-    let env_config = std::env::var("TERAKZOR_CONFIG").ok();
+    let env_config = config_env_value(std::env::var_os("TERAKZOR_CONFIG"))?;
     let candidates = resolve_config_candidates();
     let config_path = find_config_path(cli_config, env_config.as_deref(), &candidates)
         .map_err(stoolap::Error::internal)?;
@@ -1901,8 +1910,8 @@ collection_interval_seconds = 15
 
 #[cfg(test)]
 mod config_path_tests {
-    use super::{find_config_path, parse_config_arg};
-    use std::path::PathBuf;
+    use super::{config_env_value, find_config_path, parse_config_arg};
+    use std::{ffi::OsString, path::PathBuf};
 
     // helper: create a real file in a tempdir so `exists()` returns true
     fn make_file(dir: &tempfile::TempDir, name: &str) -> PathBuf {
@@ -1917,6 +1926,22 @@ mod config_path_tests {
         let cfg = make_file(&dir, "my.toml");
         let result = find_config_path(Some(cfg.to_str().unwrap()), None, &[]).unwrap();
         assert_eq!(result, Some(cfg));
+    }
+
+    #[test]
+    fn cli_arg_takes_priority_over_env_var() {
+        let dir = tempfile::tempdir().unwrap();
+        let cli = make_file(&dir, "cli.toml");
+        let env = make_file(&dir, "env.toml");
+
+        let result = find_config_path(
+            Some(cli.to_str().unwrap()),
+            Some(env.to_str().unwrap()),
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(result, Some(cli));
     }
 
     #[test]
@@ -1945,6 +1970,16 @@ mod config_path_tests {
     }
 
     #[test]
+    fn cli_arg_errors_when_path_is_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_str().unwrap();
+
+        let err = find_config_path(Some(path), None, &[]).unwrap_err();
+
+        assert!(err.contains(path), "got: {err}");
+    }
+
+    #[test]
     fn env_var_used_when_no_cli_arg_and_file_exists() {
         let dir = tempfile::tempdir().unwrap();
         let cfg = make_file(&dir, "env.toml");
@@ -1959,6 +1994,16 @@ mod config_path_tests {
     }
 
     #[test]
+    fn env_var_errors_when_path_is_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_str().unwrap();
+
+        let err = find_config_path(None, Some(path), &[]).unwrap_err();
+
+        assert!(err.contains(path), "got: {err}");
+    }
+
+    #[test]
     fn first_existing_candidate_wins() {
         let dir = tempfile::tempdir().unwrap();
         let a = dir.path().join("a.toml"); // does NOT exist
@@ -1966,6 +2011,39 @@ mod config_path_tests {
         let c = make_file(&dir, "c.toml"); // exists but lower priority
         let result = find_config_path(None, None, &[a, b.clone(), c]).unwrap();
         assert_eq!(result, Some(b));
+    }
+
+    #[test]
+    fn directory_candidate_is_skipped_for_a_later_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let directory_candidate = dir.path().join("config-directory");
+        std::fs::create_dir(&directory_candidate).unwrap();
+        let file_candidate = make_file(&dir, "terakzor.toml");
+
+        let result =
+            find_config_path(None, None, &[directory_candidate, file_candidate.clone()]).unwrap();
+
+        assert_eq!(result, Some(file_candidate));
+    }
+
+    #[test]
+    fn config_env_value_handles_missing_and_utf8_values() {
+        assert_eq!(config_env_value(None).unwrap(), None);
+        assert_eq!(
+            config_env_value(Some(OsString::from("config.toml"))).unwrap(),
+            Some("config.toml".to_owned())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_env_value_rejects_non_utf8_values() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let error = config_env_value(Some(OsString::from_vec(vec![0xFF]))).unwrap_err();
+
+        assert!(error.to_string().contains("TERAKZOR_CONFIG"), "{error}");
+        assert!(error.to_string().contains("UTF-8"), "{error}");
     }
 
     #[test]
