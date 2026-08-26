@@ -133,6 +133,24 @@ fn enabled_by_default() -> bool {
     true
 }
 
+fn resolve_config_candidates() -> Vec<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+
+    // Step 3: ./terakzor.toml (current working directory)
+    candidates.push(std::path::PathBuf::from("terakzor.toml"));
+
+    // Step 4: ~/.config/terakzor/terakzor.toml  (or OS equivalent)
+    if let Some(config_dir) = dirs::config_dir() {
+        candidates.push(config_dir.join("terakzor").join("terakzor.toml"));
+    }
+
+    // Step 5: /etc/terakzor/terakzor.toml (non-Windows only)
+    #[cfg(not(target_os = "windows"))]
+    candidates.push(std::path::PathBuf::from("/etc/terakzor/terakzor.toml"));
+
+    candidates
+}
+
 fn find_config_path(
     cli_arg: Option<&str>,
     env_var: Option<&str>,
@@ -145,7 +163,7 @@ fn find_config_path(
             return Ok(Some(path));
         }
         return Err(format!(
-            "--config path not found: {}",
+            "--config path does not exist or is not a file: {}",
             path.display()
         ));
     }
@@ -157,7 +175,7 @@ fn find_config_path(
             return Ok(Some(path));
         }
         return Err(format!(
-            "TERAKZOR_CONFIG path not found: {}",
+            "TERAKZOR_CONFIG path does not exist or is not a file: {}",
             path.display()
         ));
     }
@@ -271,7 +289,30 @@ impl MetricSource for SysinfoMetricSource {
 
 #[tokio::main]
 async fn main() -> stoolap::Result<()> {
-    let config = load_config(Path::new("terakzor.toml"))?;
+    // Parse --config <path> from argv (no external crate needed)
+    let args: Vec<String> = std::env::args().collect();
+    let cli_config = args
+        .windows(2)
+        .find(|w| w[0] == "--config")
+        .map(|w| w[1].as_str());
+
+    // Resolve which config file to use
+    let env_config = std::env::var("TERAKZOR_CONFIG").ok();
+    let candidates = resolve_config_candidates();
+    let config_path = find_config_path(cli_config, env_config.as_deref(), &candidates)
+        .map_err(stoolap::Error::internal)?;
+
+    // Print diagnostic so the user always knows what was loaded
+    match &config_path {
+        Some(p) => eprintln!("config: using {}", p.display()),
+        None => eprintln!("config: no file found, using defaults"),
+    }
+
+    let config = match config_path {
+        Some(path) => load_config(&path)?,
+        None => Config::default(),
+    };
+
     let source = SysinfoMetricSource::new().await?;
     let database = initialize_database(DATABASE_URL)?;
     start_agent(database, config, source).await
@@ -1882,8 +1923,7 @@ mod config_path_tests {
     fn env_var_used_when_no_cli_arg_and_file_exists() {
         let dir = tempfile::tempdir().unwrap();
         let cfg = make_file(&dir, "env.toml");
-        let result =
-            find_config_path(None, Some(cfg.to_str().unwrap()), &[]).unwrap();
+        let result = find_config_path(None, Some(cfg.to_str().unwrap()), &[]).unwrap();
         assert_eq!(result, Some(cfg));
     }
 
@@ -1905,7 +1945,12 @@ mod config_path_tests {
 
     #[test]
     fn returns_none_when_no_candidates_exist() {
-        let result = find_config_path(None, None, &[PathBuf::from("/no/a"), PathBuf::from("/no/b")]).unwrap();
+        let result = find_config_path(
+            None,
+            None,
+            &[PathBuf::from("/no/a"), PathBuf::from("/no/b")],
+        )
+        .unwrap();
         assert_eq!(result, None);
     }
 
@@ -1913,5 +1958,12 @@ mod config_path_tests {
     fn returns_none_when_no_candidates_given() {
         let result = find_config_path(None, None, &[]).unwrap();
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn candidates_include_cwd_and_user_dir() {
+        let candidates = super::resolve_config_candidates();
+        assert!(!candidates.is_empty());
+        assert!(candidates[0].ends_with("terakzor.toml"));
     }
 }
