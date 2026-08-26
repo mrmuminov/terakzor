@@ -1,0 +1,12 @@
+# Address the web UI listens on (default: "127.0.0.1:3000").
+listen_address = "127.0.0.1:3000"
+# Metrics older than this many days are deleted by a daily cleanup (default: 7).
+retention_days = 7
+collection_interval_seconds = 60
+
+[metrics]
+cpu_percent = true
+ram_used_bytes = true
+disk_used_bytes = true
+uptime_seconds = true
+load_average_1m = true
