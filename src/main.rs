@@ -190,6 +190,17 @@ fn find_config_path(
     Ok(None)
 }
 
+fn parse_config_arg(args: &[String]) -> Result<Option<&str>, String> {
+    match args.iter().position(|arg| arg == "--config") {
+        Some(index) => args
+            .get(index + 1)
+            .map(String::as_str)
+            .map(Some)
+            .ok_or_else(|| "--config requires a path".to_owned()),
+        None => Ok(None),
+    }
+}
+
 fn load_config(path: &Path) -> stoolap::Result<Config> {
     match fs::read_to_string(path) {
         Ok(contents) => Config::from_toml(&contents).map_err(|error| {
@@ -288,12 +299,8 @@ impl MetricSource for SysinfoMetricSource {
 
 #[tokio::main]
 async fn main() -> stoolap::Result<()> {
-    // Parse --config <path> from argv (no external crate needed)
     let args: Vec<String> = std::env::args().collect();
-    let cli_config = args
-        .windows(2)
-        .find(|w| w[0] == "--config")
-        .map(|w| w[1].as_str());
+    let cli_config = parse_config_arg(&args).map_err(stoolap::Error::internal)?;
 
     // Resolve which config file to use
     let env_config = std::env::var("TERAKZOR_CONFIG").ok();
@@ -1894,7 +1901,7 @@ collection_interval_seconds = 15
 
 #[cfg(test)]
 mod config_path_tests {
-    use super::find_config_path;
+    use super::{find_config_path, parse_config_arg};
     use std::path::PathBuf;
 
     // helper: create a real file in a tempdir so `exists()` returns true
@@ -1910,6 +1917,25 @@ mod config_path_tests {
         let cfg = make_file(&dir, "my.toml");
         let result = find_config_path(Some(cfg.to_str().unwrap()), None, &[]).unwrap();
         assert_eq!(result, Some(cfg));
+    }
+
+    #[test]
+    fn config_arg_returns_the_supplied_path() {
+        let args = vec![
+            "terakzor".to_owned(),
+            "--config".to_owned(),
+            "custom.toml".to_owned(),
+        ];
+
+        assert_eq!(parse_config_arg(&args).unwrap(), Some("custom.toml"));
+    }
+
+    #[test]
+    fn config_arg_errors_when_path_is_missing() {
+        let args = vec!["terakzor".to_owned(), "--config".to_owned()];
+        let error = parse_config_arg(&args).unwrap_err();
+
+        assert!(error.contains("--config requires a path"), "{error}");
     }
 
     #[test]
