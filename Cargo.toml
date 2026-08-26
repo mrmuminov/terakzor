@@ -1,0 +1,19 @@
+[package]
+name = "terakzor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.8"
+dirs = "5"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+stoolap = { version = "0.4.0", default-features = false }
+sysinfo = "0.37.2"
+tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "test-util", "time"] }
+tokio-util = "0.7"
+toml = "0.9.11"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tower = { version = "0.5.2", features = ["util"] }
