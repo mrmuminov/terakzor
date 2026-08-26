@@ -136,15 +136,15 @@ fn enabled_by_default() -> bool {
 fn resolve_config_candidates() -> Vec<std::path::PathBuf> {
     let mut candidates = Vec::new();
 
-    // Step 3: ./terakzor.toml (current working directory)
+    // ./terakzor.toml (current working directory)
     candidates.push(std::path::PathBuf::from("terakzor.toml"));
 
-    // Step 4: ~/.config/terakzor/terakzor.toml  (or OS equivalent)
+    // ~/.config/terakzor/terakzor.toml  (or OS equivalent)
     if let Some(config_dir) = dirs::config_dir() {
         candidates.push(config_dir.join("terakzor").join("terakzor.toml"));
     }
 
-    // Step 5: /etc/terakzor/terakzor.toml (non-Windows only)
+    // /etc/terakzor/terakzor.toml (non-Windows only)
     #[cfg(not(target_os = "windows"))]
     candidates.push(std::path::PathBuf::from("/etc/terakzor/terakzor.toml"));
 
@@ -195,7 +195,6 @@ fn load_config(path: &Path) -> stoolap::Result<Config> {
         Ok(contents) => Config::from_toml(&contents).map_err(|error| {
             stoolap::Error::internal(format!("invalid config at {}: {error}", path.display()))
         }),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Config::default()),
         Err(error) => Err(stoolap::Error::internal(format!(
             "could not read config at {}: {error}",
             path.display()
@@ -1963,7 +1962,8 @@ mod config_path_tests {
     #[test]
     fn candidates_include_cwd_and_user_dir() {
         let candidates = super::resolve_config_candidates();
-        assert!(!candidates.is_empty());
-        assert!(candidates[0].ends_with("terakzor.toml"));
+        assert_eq!(candidates[0], std::path::PathBuf::from("terakzor.toml"));
+        assert!(candidates[1].is_absolute());
+        assert!(candidates[1].ends_with(std::path::Path::new("terakzor/terakzor.toml")));
     }
 }
