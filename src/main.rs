@@ -160,6 +160,18 @@ fn config_env_value(value: Option<std::ffi::OsString>) -> stoolap::Result<Option
     }
 }
 
+fn command_line_args(
+    args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> stoolap::Result<Vec<String>> {
+    args.into_iter()
+        .map(|arg| {
+            arg.into_string().map_err(|_| {
+                stoolap::Error::internal("command-line argument must contain valid UTF-8")
+            })
+        })
+        .collect()
+}
+
 fn find_config_path(
     cli_arg: Option<&str>,
     env_var: Option<&str>,
@@ -308,7 +320,7 @@ impl MetricSource for SysinfoMetricSource {
 
 #[tokio::main]
 async fn main() -> stoolap::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
+    let args = command_line_args(std::env::args_os())?;
     let cli_config = parse_config_arg(&args).map_err(stoolap::Error::internal)?;
 
     // Resolve which config file to use
@@ -1910,7 +1922,7 @@ collection_interval_seconds = 15
 
 #[cfg(test)]
 mod config_path_tests {
-    use super::{config_env_value, find_config_path, parse_config_arg};
+    use super::{command_line_args, config_env_value, find_config_path, parse_config_arg};
     use std::{ffi::OsString, path::PathBuf};
 
     // helper: create a real file in a tempdir so `exists()` returns true
@@ -1940,6 +1952,17 @@ mod config_path_tests {
             &[],
         )
         .unwrap();
+
+        assert_eq!(result, Some(cli));
+    }
+
+    #[test]
+    fn cli_arg_takes_priority_over_candidate_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let cli = make_file(&dir, "cli.toml");
+        let candidate = make_file(&dir, "candidate.toml");
+
+        let result = find_config_path(Some(cli.to_str().unwrap()), None, &[candidate]).unwrap();
 
         assert_eq!(result, Some(cli));
     }
@@ -1985,6 +2008,17 @@ mod config_path_tests {
         let cfg = make_file(&dir, "env.toml");
         let result = find_config_path(None, Some(cfg.to_str().unwrap()), &[]).unwrap();
         assert_eq!(result, Some(cfg));
+    }
+
+    #[test]
+    fn env_var_takes_priority_over_candidate_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = make_file(&dir, "env.toml");
+        let candidate = make_file(&dir, "candidate.toml");
+
+        let result = find_config_path(None, Some(env.to_str().unwrap()), &[candidate]).unwrap();
+
+        assert_eq!(result, Some(env));
     }
 
     #[test]
@@ -2035,6 +2069,28 @@ mod config_path_tests {
         );
     }
 
+    #[test]
+    fn command_line_args_converts_utf8_values() {
+        let args =
+            command_line_args([OsString::from("terakzor"), OsString::from("--config")]).unwrap();
+
+        assert_eq!(args, ["terakzor", "--config"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_line_args_rejects_non_utf8_values() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let error = command_line_args([OsString::from_vec(vec![0xFF])]).unwrap_err();
+
+        assert!(
+            error.to_string().contains("command-line argument"),
+            "{error}"
+        );
+        assert!(error.to_string().contains("UTF-8"), "{error}");
+    }
+
     #[cfg(unix)]
     #[test]
     fn config_env_value_rejects_non_utf8_values() {
@@ -2067,7 +2123,11 @@ mod config_path_tests {
     fn candidates_include_cwd_and_user_dir() {
         let candidates = super::resolve_config_candidates();
         assert_eq!(candidates[0], std::path::PathBuf::from("terakzor.toml"));
-        assert!(candidates[1].is_absolute());
-        assert!(candidates[1].ends_with(std::path::Path::new("terakzor/terakzor.toml")));
+        if let Some(config_dir) = dirs::config_dir() {
+            assert_eq!(
+                candidates[1],
+                config_dir.join("terakzor").join("terakzor.toml")
+            );
+        }
     }
 }
