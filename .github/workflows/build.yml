@@ -113,7 +113,7 @@ jobs:
         with:
           name: terakzor-linux-${{ matrix.architecture }}
           path: dist/input
-      - uses: goreleaser/nfpm-action@v1
+      - uses: secondlife/setup-nfpm@v5
         with:
           version: latest
       - name: Install package inspectors
