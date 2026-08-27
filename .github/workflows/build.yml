@@ -113,9 +113,17 @@ jobs:
         with:
           name: terakzor-linux-${{ matrix.architecture }}
           path: dist/input
-      - uses: secondlife/setup-nfpm@v5
-        with:
-          version: 2.47.0
+      - name: Install nFPM
+        run: |
+          case "$(uname -m)" in
+            x86_64) nfpm_arch=x86_64 ;;
+            aarch64) nfpm_arch=arm64 ;;
+            *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          set -o pipefail
+          curl --fail --silent --show-error --location \
+            "https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_Linux_${nfpm_arch}.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
       - name: Install package inspectors
         run: sudo apt-get update && sudo apt-get install --yes rpm
       - name: Build packages
