@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }} (${{ matrix.architecture }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            architecture: x86_64
+            runner: ubuntu-24.04
+            binary: terakzor
+          - platform: linux
+            architecture: aarch64
+            runner: ubuntu-24.04-arm
+            binary: terakzor
+          - platform: macos
+            architecture: x86_64
+            runner: macos-15-intel
+            binary: terakzor
+          - platform: macos
+            architecture: aarch64
+            runner: macos-15
+            binary: terakzor
+          - platform: windows
+            architecture: x86_64
+            runner: windows-2025
+            binary: terakzor.exe
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --all-targets
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: terakzor-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: target/release/${{ matrix.binary }}
+          if-no-files-found: error

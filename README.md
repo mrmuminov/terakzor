@@ -99,6 +99,12 @@ Run the development validation suite with:
 cargo test --all-targets
 ```
 
+## GitHub Builds
+
+GitHub Actions tests and builds release binaries for Linux x86_64 and aarch64,
+macOS x86_64 and aarch64, and Windows x86_64. Download the matching binary
+from the workflow run artifacts.
+
 ## Platform Notes
 
 On Windows, sysinfo reports the load average as `0`.
