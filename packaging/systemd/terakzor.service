@@ -1,0 +1,21 @@
+[Unit]
+Description=Terakzor local system metrics monitor
+After=network.target
+
+[Service]
+Type=simple
+User=terakzor
+Group=terakzor
+WorkingDirectory=/var/lib/terakzor
+Environment=XDG_DATA_HOME=/var/lib
+ExecStart=/usr/bin/terakzor --config /etc/terakzor/terakzor.toml
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

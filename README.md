@@ -87,9 +87,58 @@ An explicit invalid or missing `--config` or `TERAKZOR_CONFIG` path is an error.
 
 ## Storage and Retention
 
-Metrics are stored in `terakzor.db` in the current directory using embedded Stoolap. The default retention period is 7 days. Expired data is removed at startup and then daily.
+Metrics are stored with embedded Stoolap in the local application data directory:
+
+- Linux: `${XDG_DATA_HOME:-~/.local/share}/terakzor/terakzor.db`
+- macOS: `~/Library/Application Support/terakzor/terakzor.db`
+- Windows: `%LOCALAPPDATA%\\terakzor\\terakzor.db`
+
+The packaged Linux service sets `XDG_DATA_HOME=/var/lib`, so its database is
+`/var/lib/terakzor/terakzor.db`. Existing databases in a previous working
+directory are not moved automatically. The default retention period is 7 days;
+expired data is removed at startup and then daily.
 
 On SIGINT or SIGTERM, where supported, Terakzor stops gracefully: it drains queued metrics before closing the database.
+
+## Linux Packages
+
+Version tags publish Linux packages for `x86_64` and `aarch64` when supported
+by the target distribution:
+
+- Debian 9+ and Ubuntu 16.04+: `.deb`
+- RHEL 7+ compatible systems: `.rpm`
+- Alpine 3.5+: `.apk`
+- Current Arch Linux: `.pkg.tar.zst`
+
+Download the package matching the system architecture from the GitHub Release,
+then install it with the native package manager:
+
+```bash
+sudo apt install ./terakzor-<version>-amd64.deb
+sudo dnf install ./terakzor-<version>-amd64.rpm
+sudo apk add --allow-untrusted ./terakzor-<version>-amd64.apk
+sudo pacman -U ./terakzor-<version>-amd64.pkg.tar.zst
+```
+
+Installation creates the `terakzor` service account, installs the default
+configuration at `/etc/terakzor/terakzor.toml`, creates persistent state at
+`/var/lib/terakzor`, enables the service, and starts it. Systemd-based systems
+use `systemctl`; Alpine uses OpenRC:
+
+```bash
+sudo systemctl status terakzor
+sudo systemctl restart terakzor
+sudo rc-service terakzor status
+sudo rc-service terakzor restart
+```
+
+The service always loads `/etc/terakzor/terakzor.toml` explicitly. Package
+upgrades preserve local configuration changes and may leave a package-manager
+replacement file such as `.rpmnew`, `.apk-new`, or `.pacnew` for review.
+Removing a package stops and disables the service while retaining the service
+account and `/var/lib/terakzor` metrics database. Package managers normally
+retain modified configuration files; an untouched packaged default may be
+removed.
 
 ## Development
 
@@ -101,9 +150,15 @@ cargo test --all-targets
 
 ## GitHub Builds
 
-GitHub Actions tests and builds release binaries for Linux x86_64 and aarch64,
-macOS x86_64 and aarch64, and Windows x86_64. Download the matching binary
-from the workflow run artifacts.
+GitHub Actions runs for numeric SemVer tags. It checks formatting, linting, and
+tests; builds static Linux binaries and native macOS/Windows binaries; then
+installs the x86_64 Linux packages in Debian 9, Ubuntu 16.04, CentOS 7, Alpine
+3.5, and Arch Linux containers. It publishes the Linux packages and
+`SHA256SUMS` on the GitHub Release.
+
+## License
+
+Terakzor is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Platform Notes
 

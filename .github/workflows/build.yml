@@ -1,4 +1,4 @@
-name: Build
+name: Release
 
 on:
   push:
@@ -9,6 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify tag version
+        run: test "$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')" = "$GITHUB_REF_NAME"
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all-targets
+
   build:
     name: ${{ matrix.platform }} (${{ matrix.architecture }})
     runs-on: ${{ matrix.runner }}
@@ -20,37 +33,134 @@ jobs:
             architecture: x86_64
             runner: ubuntu-24.04
             binary: terakzor
+            target: x86_64-unknown-linux-musl
+            build_command: cargo zigbuild --release --target x86_64-unknown-linux-musl
+            artifact_path: target/x86_64-unknown-linux-musl/release/terakzor
           - platform: linux
             architecture: aarch64
             runner: ubuntu-24.04-arm
             binary: terakzor
+            target: aarch64-unknown-linux-musl
+            build_command: cargo zigbuild --release --target aarch64-unknown-linux-musl
+            artifact_path: target/aarch64-unknown-linux-musl/release/terakzor
           - platform: macos
             architecture: x86_64
             runner: macos-15-intel
             binary: terakzor
+            target: ""
+            build_command: cargo build --release
+            artifact_path: target/release/terakzor
           - platform: macos
             architecture: aarch64
             runner: macos-15
             binary: terakzor
+            target: ""
+            build_command: cargo build --release
+            artifact_path: target/release/terakzor
           - platform: windows
             architecture: x86_64
             runner: windows-2025
             binary: terakzor.exe
+            target: ""
+            build_command: cargo build --release
+            artifact_path: target/release/terakzor.exe
 
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: mlugg/setup-zig@v2
+        if: matrix.target != ''
+      - uses: taiki-e/install-action@v2
+        if: matrix.target != ''
+        with:
+          tool: cargo-zigbuild
+      - name: Install Linux target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
 
       - name: Test
         run: cargo test --all-targets
 
       - name: Build release binary
-        run: cargo build --release
+        run: ${{ matrix.build_command }}
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: terakzor-${{ matrix.platform }}-${{ matrix.architecture }}
-          path: target/release/${{ matrix.binary }}
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error
+
+  package:
+    name: Linux packages (${{ matrix.architecture }})
+    needs: [quality, build]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            package_architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: aarch64
+            package_architecture: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: terakzor-linux-${{ matrix.architecture }}
+          path: dist/input
+      - uses: goreleaser/nfpm-action@v1
+        with:
+          version: latest
+      - name: Install package inspectors
+        run: sudo apt-get update && sudo apt-get install --yes rpm
+      - name: Build packages
+        env:
+          TERAKZOR_ARCH: ${{ matrix.package_architecture }}
+          TERAKZOR_BINARY: dist/input/terakzor
+          TERAKZOR_VERSION: ${{ github.ref_name }}
+        run: scripts/package/build.sh
+      - name: Verify package contents
+        env:
+          TERAKZOR_BINARY: dist/input/terakzor
+        run: scripts/package/verify-contents.sh dist/packages/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terakzor-linux-packages-${{ matrix.architecture }}
+          path: dist/packages/
+          if-no-files-found: error
+
+  release:
+    name: Publish release assets
+    needs: [package, package-installation]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: terakzor-linux-packages-*
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        run: sha256sum dist/* > dist/SHA256SUMS
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" --verify-tag --generate-notes dist/*
+
+  package-installation:
+    name: Package installation checks
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: terakzor-linux-packages-x86_64
+          path: dist/packages
+      - run: scripts/package/verify-installation.sh dist/packages

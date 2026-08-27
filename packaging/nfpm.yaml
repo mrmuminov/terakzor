@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
+name: terakzor
+arch: ${TERAKZOR_ARCH}
+platform: linux
+version: ${TERAKZOR_VERSION}
+release: 1
+section: utils
+priority: optional
+maintainer: Bakhriddin Muminov <info@bahriddin.uz>
+description: |
+  Local system metrics monitor with an embedded dashboard and database.
+vendor: Terakzor
+homepage: https://github.com/mrmuminov/terakzor
+license: Apache-2.0
+umask: 0o022
+
+contents:
+  - src: ${TERAKZOR_BINARY}
+    dst: /usr/bin/terakzor
+    expand: true
+    file_info:
+      mode: 0755
+  - src: terakzor.toml
+    dst: /etc/terakzor/terakzor.toml
+    type: config|noreplace
+    file_info:
+      mode: 0644
+  - src: LICENSE
+    dst: /usr/share/doc/terakzor/copyright
+    file_info:
+      mode: 0644
+  - src: packaging/systemd/terakzor.service
+    dst: /lib/systemd/system/terakzor.service
+    packager: deb
+    file_info:
+      mode: 0644
+  - src: packaging/systemd/terakzor.service
+    dst: /usr/lib/systemd/system/terakzor.service
+    packager: rpm
+    file_info:
+      mode: 0644
+  - src: packaging/systemd/terakzor.service
+    dst: /usr/lib/systemd/system/terakzor.service
+    packager: archlinux
+    file_info:
+      mode: 0644
+  - src: packaging/openrc/terakzor
+    dst: /etc/init.d/terakzor
+    packager: apk
+    file_info:
+      mode: 0755
+
+scripts:
+  preinstall: packaging/scripts/preinstall.sh
+  postinstall: packaging/scripts/postinstall.sh
+  preremove: packaging/scripts/preremove.sh
+  postremove: packaging/scripts/postremove.sh
+
+rpm:
+  group: Applications/System

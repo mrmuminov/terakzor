@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -18,8 +18,6 @@ const RETENTION_CLEANUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 const DEFAULT_RETENTION_DAYS: u64 = 7;
 const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
 const CHANNEL_CAPACITY: usize = 16;
-const DATABASE_URL: &str = "file://terakzor.db";
-
 const WEB_LISTEN_ADDRESS: &str = "127.0.0.1:3000";
 const RECENT_WINDOW_SECONDS: i64 = 24 * 60 * 60;
 const SUPPORTED_METRICS: [&str; 5] = [
@@ -234,6 +232,25 @@ fn load_config(path: &Path) -> stoolap::Result<Config> {
     }
 }
 
+fn default_database_url() -> stoolap::Result<String> {
+    let data_directory = dirs::data_local_dir()
+        .ok_or_else(|| stoolap::Error::internal("could not determine the local data directory"))?;
+    database_url_in(&data_directory)
+}
+
+fn database_url_in(data_directory: &Path) -> stoolap::Result<String> {
+    let database_path: PathBuf = data_directory.join("terakzor").join("terakzor.db");
+    let database_directory = database_path.parent().expect("database path has a parent");
+    fs::create_dir_all(database_directory).map_err(|error| {
+        stoolap::Error::internal(format!(
+            "could not create database directory {}: {error}",
+            database_directory.display()
+        ))
+    })?;
+
+    Ok(format!("file://{}", database_path.display()))
+}
+
 #[derive(Serialize)]
 struct MetricsResponse {
     samples: Vec<MetricSample>,
@@ -341,7 +358,8 @@ async fn main() -> stoolap::Result<()> {
     };
 
     let source = SysinfoMetricSource::new().await?;
-    let database = initialize_database(DATABASE_URL)?;
+    let database_url = default_database_url()?;
+    let database = initialize_database(&database_url)?;
     start_agent(database, config, source).await
 }
 
@@ -802,8 +820,8 @@ mod tests {
     use super::{
         CHANNEL_CAPACITY, COLLECTION_INTERVAL, Config, LONG_RETENTION, Metric, MetricSource,
         SysinfoMetricSource, WEB_LISTEN_ADDRESS, app, collect_scheduled_cycles,
-        collect_scheduled_cycles_with_config, collector_task, db_writer_task, initialize_database,
-        run_pipeline_once, run_pipeline_once_with_config,
+        collect_scheduled_cycles_with_config, collector_task, database_url_in, db_writer_task,
+        initialize_database, run_pipeline_once, run_pipeline_once_with_config,
     };
     use axum::{
         body::Body,
@@ -813,6 +831,17 @@ mod tests {
     use tower::ServiceExt;
 
     static API_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn database_url_uses_an_app_specific_data_directory() {
+        let directory = tempfile::tempdir().unwrap();
+
+        let database_url = database_url_in(directory.path()).unwrap();
+        let database_path = directory.path().join("terakzor").join("terakzor.db");
+
+        assert_eq!(database_url, format!("file://{}", database_path.display()));
+        assert!(database_path.parent().unwrap().is_dir());
+    }
 
     struct FakeMetricSource {
         next_timestamp: i64,

@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+name="terakzor"
+description="Terakzor local system metrics monitor"
+command="/usr/bin/terakzor"
+command_args="--config /etc/terakzor/terakzor.toml"
+command_background="yes"
+command_user="terakzor:terakzor"
+directory="/var/lib/terakzor"
+pidfile="/run/${RC_SVCNAME}.pid"
+export XDG_DATA_HOME="/var/lib"
+
+depend() {
+    need net
+}
