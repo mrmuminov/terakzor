@@ -43,6 +43,8 @@ Example response:
 { "samples": [{ "timestamp": 0, "cpu_percent": 0.0 }] }
 ```
 
+Each sample includes `timestamp` plus available enabled metric fields from `cpu_percent`, `ram_used_bytes`, `disk_used_bytes`, `uptime_seconds`, and `load_average_1m`. Fields may be absent when disabled or unavailable.
+
 ## Configuration
 
 The sample configuration file is `terakzor.toml`.
