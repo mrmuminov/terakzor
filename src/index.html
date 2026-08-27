@@ -3,134 +3,409 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Terakzor Console</title>
-  <link rel="stylesheet" href="https://unpkg.com/uplot@1.6.32/dist/uPlot.min.css">
+  <meta name="theme-color" content="#111514">
+  <title>Terakzor Host Monitor</title>
+  <script>
+    (() => {
+      try {
+        const preference = localStorage.getItem("terakzor-theme");
+        const theme = preference === "light" || preference === "dark"
+          ? preference
+          : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      } catch {
+        document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/assets/uplot-1.6.32/uPlot.min.css">
   <style>
-    :root { color-scheme: dark; --ground: #111514; --panel: #181e1c; --line: #36403c; --text: #e7eee9; --muted: #8e9b94; --signal: #79e39d; }
+    :root {
+      color-scheme: light;
+      --ground: #f4f5f0;
+      --panel: #ffffff;
+      --panel-muted: #ecefe9;
+      --line: #c8d0ca;
+      --text: #18211d;
+      --muted: #53615a;
+      --signal: #087a3d;
+      --warning: #986500;
+      --danger: #ad332e;
+      --focus: #125fc4;
+      --chart-grid: #dce2dc;
+      --chart-cpu: #087a3d;
+      --chart-ram: #39715f;
+      --chart-disk: #19708b;
+      --chart-uptime: #9a6800;
+      --chart-load: #985177;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --ground: #111514;
+      --panel: #181e1c;
+      --panel-muted: #202824;
+      --line: #36403c;
+      --text: #e7eee9;
+      --muted: #aab5af;
+      --signal: #79e39d;
+      --warning: #e4ba74;
+      --danger: #ff9a91;
+      --focus: #9dc4ff;
+      --chart-grid: #28302d;
+      --chart-cpu: #79e39d;
+      --chart-ram: #9cbbb0;
+      --chart-disk: #74bad3;
+      --chart-uptime: #e4ba74;
+      --chart-load: #d69aca;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--ground); color: var(--text); font-family: "IBM Plex Mono", "Courier New", monospace; }
-    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
-    header { display: flex; justify-content: space-between; gap: 24px; align-items: end; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
-    h1 { margin: 0; font-size: clamp(1.8rem, 6vw, 4.5rem); letter-spacing: -0.08em; line-height: .85; text-transform: uppercase; }
-    .status { color: var(--signal); font-size: .75rem; letter-spacing: .12em; white-space: nowrap; }
-    .status::before { content: "●"; margin-right: 8px; }
-    .readouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 24px 0; background: var(--line); border: 1px solid var(--line); }
-    .readout { background: var(--panel); padding: 18px; }
-    .label { color: var(--muted); display: block; font-size: .68rem; letter-spacing: .13em; text-transform: uppercase; }
-    output { display: block; margin-top: 8px; color: var(--signal); font-size: clamp(1.4rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -.08em; }
+    html { background: var(--ground); }
+    body { min-width: 320px; margin: 0; overflow-x: hidden; background: var(--ground); color: var(--text); font-family: "IBM Plex Mono", "Courier New", ui-monospace, monospace; }
+    button { font: inherit; }
+    .skip-link { position: fixed; z-index: 2; top: 12px; left: 12px; transform: translateY(-200%); padding: 10px 14px; background: var(--text); color: var(--ground); text-decoration: none; }
+    .skip-link:focus { transform: translateY(0); }
+    main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 56px; }
+    .app-header { display: flex; align-items: end; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+    .eyebrow, .label, figcaption, .status, .state-kicker { margin: 0; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .13em; line-height: 1.35; text-transform: uppercase; }
+    h1 { max-width: 9ch; margin: 7px 0 0; font-size: clamp(2.25rem, 6vw, 4.75rem); letter-spacing: -.065em; line-height: .9; text-transform: uppercase; text-wrap: balance; }
+    .header-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 9px; }
+    .status { display: flex; align-items: center; min-height: 44px; color: var(--signal); white-space: nowrap; }
+    .status::before { content: ""; width: 8px; height: 8px; margin-right: 9px; border-radius: 50%; background: currentColor; }
+    .status[data-kind="loading"] { color: var(--warning); }
+    .status[data-kind="error"] { color: var(--danger); }
+    .control { min-height: 44px; border: 1px solid var(--line); border-radius: 3px; padding: 0 13px; background: var(--panel); color: var(--text); cursor: pointer; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .control:hover:not(:disabled) { border-color: var(--text); background: var(--panel-muted); }
+    .control:disabled { cursor: wait; opacity: .65; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .state { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin: 24px 0; border: 1px solid var(--line); border-left: 4px solid var(--signal); padding: 18px; background: var(--panel); }
+    .state[data-tone="error"] { border-left-color: var(--danger); }
+    .state[data-tone="empty"] { border-left-color: var(--warning); }
+    .state h2 { margin: 5px 0 0; font-size: 1rem; letter-spacing: -.03em; }
+    .state p:not(.state-kicker) { max-width: 64ch; margin: 6px 0 0; color: var(--muted); font-size: .86rem; line-height: 1.5; }
+    .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; margin: 24px 0; border: 1px solid var(--line); background: var(--line); }
+    .readout { min-width: 0; min-height: 128px; padding: 18px; background: var(--panel); }
+    output { display: block; margin-top: 12px; color: var(--text); font-size: clamp(1.55rem, 4vw, 2.55rem); font-weight: 700; letter-spacing: -.075em; line-height: 1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .readout:first-child output { color: var(--signal); }
+    .readout-detail { margin: 11px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
+    .placeholder { position: relative; overflow: hidden; color: transparent; }
+    .placeholder::after { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 20%, color-mix(in srgb, var(--text) 8%, transparent) 45%, transparent 70%); content: ""; transform: translateX(-100%); animation: sweep 1.6s ease-in-out infinite; }
+    .placeholder .label, .placeholder output, .placeholder .readout-detail { color: transparent; border-radius: 2px; background: var(--panel-muted); }
+    .placeholder output { width: 68%; height: 2rem; }
+    .placeholder .readout-detail { width: 40%; height: .7rem; }
     .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .chart-panel { min-width: 0; margin: 0; border: 1px solid var(--line); background: var(--panel); padding: 18px; }
-    figcaption { color: var(--muted); font-size: .68rem; letter-spacing: .13em; text-transform: uppercase; }
+    .chart-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    figcaption { color: var(--muted); }
+    .chart-value { color: var(--text); font-size: .82rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .chart { width: 100%; min-height: 240px; margin-top: 14px; }
-    .error { color: #ff8f88 !important; }
+    .chart-note { margin: 9px 0 0; color: var(--muted); font-size: .7rem; line-height: 1.35; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-    @media (max-width: 560px) { main { width: min(100% - 24px, 1120px); padding-top: 24px; } header { align-items: start; flex-direction: column; } .readouts, .chart-grid { grid-template-columns: 1fr; } .chart-panel { padding: 12px; } }
+    @keyframes sweep { to { transform: translateX(100%); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; } }
+    @media (max-width: 719px) {
+      main { width: min(100% - 32px, 1180px); padding-top: 22px; }
+      .app-header { align-items: start; flex-direction: column; }
+      .header-controls { justify-content: start; }
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .header-controls { width: 100%; }
+      .status { width: 100%; }
+      .control { flex: 1; padding: 0 9px; }
+      .state { grid-template-columns: 1fr; }
+      .state .control { justify-self: start; }
+      .chart-panel, .readout, .state { padding: 15px; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <header><h1>Host<br>Monitor</h1><span id="status" class="status" role="status" aria-live="polite">Loading telemetry</span></header>
-    <section id="readouts" class="readouts" aria-label="Current measurements"></section>
-    <p id="chart-summary" class="sr-only" aria-live="polite">Loading telemetry.</p>
+  <a class="skip-link" href="#dashboard">Skip to monitoring data</a>
+  <main id="dashboard" tabindex="-1">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Terakzor / Host telemetry</p>
+        <h1>Host Monitor</h1>
+      </div>
+      <div class="header-controls">
+        <span id="status" class="status" data-kind="loading" role="status" aria-live="polite">Loading telemetry</span>
+        <button id="retry" class="control" type="button">Refresh</button>
+        <button id="theme-toggle" class="control" type="button" aria-pressed="false">Dark mode</button>
+      </div>
+    </header>
+    <section id="state" class="state" aria-labelledby="state-title" hidden></section>
+    <section id="readouts" class="readouts" aria-label="Current measurements" aria-busy="true"></section>
+    <p id="chart-summary" class="sr-only">Loading telemetry.</p>
     <section id="charts" class="chart-grid" aria-label="Metric history" hidden></section>
   </main>
-  <script src="https://unpkg.com/uplot@1.6.32/dist/uPlot.iife.min.js"></script>
+  <script src="/assets/uplot-1.6.32/uPlot.iife.min.js"></script>
   <script>
     const status = document.querySelector("#status");
+    const stateElement = document.querySelector("#state");
     const summary = document.querySelector("#chart-summary");
     const chartsElement = document.querySelector("#charts");
     const readoutsElement = document.querySelector("#readouts");
+    const retryButton = document.querySelector("#retry");
+    const themeToggle = document.querySelector("#theme-toggle");
+    const themeColor = document.querySelector("meta[name=theme-color]");
+    const themeStorageKey = "terakzor-theme";
+    const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+    const metricDefinitions = {
+      cpu_percent: { label: "CPU load", chartLabel: "CPU percent", format: (value) => `${value.toFixed(1)}%`, stroke: "--chart-cpu" },
+      ram_used_bytes: { label: "RAM used", chartLabel: "RAM bytes", format: bytes, stroke: "--chart-ram" },
+      disk_used_bytes: { label: "Disk used", chartLabel: "Disk bytes", format: bytes, stroke: "--chart-disk" },
+      uptime_seconds: { label: "Uptime", chartLabel: "Uptime seconds", format: (value) => `${Math.floor(value / 3600)}h ${Math.floor(value % 3600 / 60)}m`, stroke: "--chart-uptime" },
+      load_average_1m: { label: "Load average", chartLabel: "Load average (1m)", format: (value) => value.toFixed(2), stroke: "--chart-load" },
+    };
     let plots = [];
     let resizeObserver;
-
-    const metricDefinitions = {
-      cpu_percent: { label: "CPU load", chartLabel: "CPU percent", format: (value) => `${value.toFixed(1)}%`, stroke: "#79e39d" },
-      ram_used_bytes: { label: "RAM used", chartLabel: "RAM bytes", format: bytes, stroke: "#9cbbb0" },
-      disk_used_bytes: { label: "Disk used", chartLabel: "Disk bytes", format: bytes, stroke: "#74bad3" },
-      uptime_seconds: { label: "Uptime", chartLabel: "Uptime seconds", format: (value) => `${Math.floor(value / 3600)}h ${Math.floor(value % 3600 / 60)}m`, stroke: "#e4ba74" },
-      load_average_1m: { label: "Load average", chartLabel: "Load average (1m)", format: (value) => value.toFixed(2), stroke: "#d69aca" },
-    };
+    let resizeFrame;
+    let requestController;
+    let currentSamples;
 
     function bytes(value) {
       return value >= 1073741824 ? `${(value / 1073741824).toFixed(2)} GiB` : `${(value / 1048576).toFixed(1)} MiB`;
     }
 
-    function setStatus(text, isError = false) {
+    function color(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function setStatus(text, kind = "ready") {
       status.textContent = text;
-      status.classList.toggle("error", isError);
+      status.dataset.kind = kind;
     }
 
-    function definitionFor(metricName) {
-      return metricDefinitions[metricName] || { label: metricName.replaceAll("_", " "), chartLabel: metricName.replaceAll("_", " "), format: (value) => value.toFixed(2), stroke: "#79e39d" };
+    function setTheme(theme, persist = false) {
+      document.documentElement.dataset.theme = theme;
+      themeColor.content = theme === "dark" ? "#111514" : "#f4f5f0";
+      themeToggle.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+      themeToggle.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} mode`);
+      themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
+      if (persist) {
+        try { localStorage.setItem(themeStorageKey, theme); } catch {}
+      }
+      if (currentSamples?.length) renderDashboard(currentSamples);
     }
 
-    function renderReadouts(latest) {
-      readoutsElement.replaceChildren();
-      Object.entries(latest).filter(([name, value]) => name !== "timestamp" && value != null).forEach(([name, value]) => {
-        const definition = definitionFor(name);
+    function storedTheme() {
+      try {
+        const preference = localStorage.getItem(themeStorageKey);
+        return preference === "light" || preference === "dark" ? preference : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function resolvedTheme() {
+      return storedTheme() || (systemTheme.matches ? "dark" : "light");
+    }
+
+    function showState(title, detail, tone = "empty", retry = false) {
+      stateElement.hidden = false;
+      stateElement.dataset.tone = tone;
+      const content = document.createElement("div");
+      const kicker = document.createElement("p");
+      kicker.className = "state-kicker";
+      kicker.textContent = tone === "error" ? "Telemetry unavailable" : "Waiting for telemetry";
+      const heading = document.createElement("h2");
+      heading.id = "state-title";
+      heading.textContent = title;
+      const description = document.createElement("p");
+      description.textContent = detail;
+      content.append(kicker, heading, description);
+      stateElement.replaceChildren(content);
+      if (retry) {
+        const button = document.createElement("button");
+        button.className = "control";
+        button.type = "button";
+        button.textContent = "Retry now";
+        button.addEventListener("click", loadMetrics);
+        stateElement.append(button);
+      }
+    }
+
+    function hideState() {
+      stateElement.hidden = true;
+      stateElement.replaceChildren();
+    }
+
+    function clearCharts() {
+      plots.forEach(({ plot }) => plot.destroy());
+      plots = [];
+      chartsElement.replaceChildren();
+    }
+
+    function metricNames(samples) {
+      return Object.keys(metricDefinitions).filter((name) => samples.some((sample) => sample[name] != null));
+    }
+
+    function valueFor(definition, value) {
+      return typeof value === "number" && Number.isFinite(value) ? definition.format(value) : "—";
+    }
+
+    function formattedTime(timestamp) {
+      return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp * 1000));
+    }
+
+    function renderLoading() {
+      hideState();
+      clearCharts();
+      chartsElement.hidden = true;
+      readoutsElement.setAttribute("aria-busy", "true");
+      readoutsElement.replaceChildren(...Object.keys(metricDefinitions).map(() => {
+        const readout = document.createElement("div");
+        readout.className = "readout placeholder";
+        readout.innerHTML = '<span class="label">Loading</span><output>000</output><p class="readout-detail">Loading</p>';
+        return readout;
+      }));
+      summary.textContent = "Loading telemetry.";
+    }
+
+    function renderReadouts(latest, names) {
+      readoutsElement.setAttribute("aria-busy", "false");
+      readoutsElement.replaceChildren(...names.map((name) => {
+        const definition = metricDefinitions[name];
         const readout = document.createElement("div");
         readout.className = "readout";
         const label = document.createElement("span");
         label.className = "label";
         label.textContent = definition.label;
         const output = document.createElement("output");
-        output.textContent = definition.format(value);
-        readout.append(label, output);
-        readoutsElement.append(readout);
-      });
+        output.textContent = valueFor(definition, latest[name]);
+        const detail = document.createElement("p");
+        detail.className = "readout-detail";
+        detail.textContent = latest[name] == null ? "Unavailable in latest sample" : "Latest sample";
+        readout.append(label, output, detail);
+        return readout;
+      }));
     }
 
     function renderChart(metricName, samples, timestamps) {
-      const definition = definitionFor(metricName);
+      const definition = metricDefinitions[metricName];
+      const latest = samples.at(-1)[metricName];
       const panel = document.createElement("figure");
       panel.className = "chart-panel";
+      const heading = document.createElement("div");
+      heading.className = "chart-heading";
       const caption = document.createElement("figcaption");
       caption.textContent = definition.chartLabel;
+      const value = document.createElement("span");
+      value.className = "chart-value";
+      value.textContent = valueFor(definition, latest);
+      heading.append(caption, value);
       const target = document.createElement("div");
-      target.id = `${metricName}-chart`;
       target.className = "chart";
-      panel.append(caption, target);
+      const note = document.createElement("p");
+      note.className = "chart-note";
+      note.textContent = `${samples.length} samples · Browser local time`;
+      panel.append(heading, target, note);
       chartsElement.append(panel);
-      createChart(target, definition.chartLabel, { timestamps, measurements: samples.map((sample) => sample[metricName] ?? null) }, definition.stroke, definition.format);
+      createChart(target, definition, timestamps, samples.map((sample) => sample[metricName] ?? null));
     }
 
-    function createChart(target, label, values, stroke, format) {
+    function createChart(target, definition, timestamps, measurements) {
       const plot = new uPlot({
-        width: target.clientWidth,
+        width: Math.max(target.clientWidth, 1),
         height: 240,
         legend: { show: false },
-        series: [{}, { label, stroke, width: 2 }],
-        axes: [{ stroke: "#8e9b94", grid: { stroke: "#28302d" } }, { stroke: "#8e9b94", grid: { stroke: "#28302d" }, values: (_, ticks) => ticks.map(format) }],
-      }, [values.timestamps, values.measurements], target);
+        series: [{}, { label: definition.chartLabel, stroke: color(definition.stroke), width: 2 }],
+        axes: [
+          { stroke: color("--muted"), grid: { stroke: color("--chart-grid") } },
+          { stroke: color("--muted"), grid: { stroke: color("--chart-grid") }, values: (_, ticks) => ticks.map((tick) => valueFor(definition, tick)) },
+        ],
+      }, [timestamps, measurements], target);
       plots.push({ plot, target });
     }
 
-    fetch("/api/metrics")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
-      .then(({ samples }) => {
-        if (!samples.length) {
-          setStatus("No telemetry collected");
-          summary.textContent = "No telemetry has been collected yet.";
+    function renderDashboard(samples) {
+      const latest = samples.at(-1);
+      const names = metricNames(samples);
+      hideState();
+      renderReadouts(latest, names);
+      clearCharts();
+      const timestamps = samples.map((sample) => sample.timestamp);
+      names.forEach((name) => renderChart(name, samples, timestamps));
+      chartsElement.hidden = names.length === 0;
+      const timestamp = formattedTime(latest.timestamp);
+      setStatus(`Latest sample ${timestamp}`);
+      summary.textContent = `${names.map((name) => `${metricDefinitions[name].label} is ${valueFor(metricDefinitions[name], latest[name])}`).join("; ")}. ${samples.length} samples are displayed. Browser local time.`;
+    }
+
+    function renderEmpty() {
+      currentSamples = undefined;
+      clearCharts();
+      chartsElement.hidden = true;
+      readoutsElement.setAttribute("aria-busy", "false");
+      readoutsElement.replaceChildren();
+      setStatus("No telemetry collected", "loading");
+      showState("No telemetry yet", "This page will populate after the collector records its first sample.");
+      summary.textContent = "No telemetry has been collected yet.";
+    }
+
+    function renderError() {
+      currentSamples = undefined;
+      clearCharts();
+      chartsElement.hidden = true;
+      readoutsElement.setAttribute("aria-busy", "false");
+      readoutsElement.replaceChildren();
+      setStatus("Telemetry unavailable", "error");
+      showState("Could not load telemetry", "Check that the Terakzor service is running, then retry.", "error", true);
+      summary.textContent = "Could not load telemetry. Retry after checking the service.";
+    }
+
+    async function loadMetrics() {
+      requestController?.abort();
+      const controller = new AbortController();
+      requestController = controller;
+      retryButton.disabled = true;
+      retryButton.textContent = currentSamples?.length ? "Refreshing" : "Loading";
+      if (!currentSamples?.length) renderLoading();
+      else setStatus("Refreshing telemetry", "loading");
+      try {
+        const response = await fetch("/api/metrics", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Telemetry request failed");
+        const payload = await response.json();
+        if (!Array.isArray(payload.samples)) throw new Error("Invalid telemetry response");
+        if (controller.signal.aborted) return;
+        if (!payload.samples.length) {
+          renderEmpty();
           return;
         }
-        const latest = samples.at(-1);
-        renderReadouts(latest);
-        const metricNames = [...new Set(samples.flatMap((sample) => Object.keys(sample)))].filter((name) => name !== "timestamp");
-        setStatus("Live data link");
-        summary.textContent = `${metricNames.filter((name) => latest[name] != null).map((name) => `${definitionFor(name).label} is ${definitionFor(name).format(latest[name])}`).join("; ") || "metrics pending"}; ${samples.length} samples are displayed.`;
-        chartsElement.hidden = false;
-        chartsElement.replaceChildren();
-        const timestamps = samples.map((sample) => sample.timestamp);
-        metricNames.forEach((metricName) => renderChart(metricName, samples, timestamps));
-        resizeObserver = new ResizeObserver(() => plots.forEach(({ plot, target }) => plot.setSize({ width: target.clientWidth, height: 240 })));
-        resizeObserver.observe(chartsElement);
-      })
-      .catch((error) => {
-        setStatus(`Telemetry error: ${error.message}`, true);
-        summary.textContent = `Telemetry error: ${error.message}`;
-      });
+        if (!payload.samples.every((sample) => Number.isFinite(sample.timestamp))) throw new Error("Invalid telemetry response");
+        currentSamples = payload.samples;
+        renderDashboard(currentSamples);
+      } catch (error) {
+        if (!controller.signal.aborted) renderError();
+      } finally {
+        if (requestController === controller) {
+          requestController = undefined;
+          retryButton.disabled = false;
+          retryButton.textContent = "Refresh";
+        }
+      }
+    }
 
-    window.addEventListener("pagehide", () => resizeObserver?.disconnect(), { once: true });
+    resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => plots.forEach(({ plot, target }) => {
+        const width = Math.floor(target.clientWidth);
+        if (width > 0) plot.setSize({ width, height: 240 });
+      }));
+    });
+    resizeObserver.observe(chartsElement);
+    retryButton.addEventListener("click", loadMetrics);
+    themeToggle.addEventListener("click", () => setTheme(resolvedTheme() === "dark" ? "light" : "dark", true));
+    systemTheme.addEventListener("change", () => {
+      if (!storedTheme()) setTheme(systemTheme.matches ? "dark" : "light");
+    });
+    setTheme(resolvedTheme());
+    loadMetrics();
+    window.addEventListener("pagehide", () => {
+      requestController?.abort();
+      cancelAnimationFrame(resizeFrame);
+      resizeObserver.disconnect();
+      clearCharts();
+    }, { once: true });
   </script>
 </body>
 </html>

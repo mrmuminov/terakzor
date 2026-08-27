@@ -60,7 +60,7 @@ for package in "$@"; do
             ;;
     esac
 
-    for required in usr/bin/terakzor etc/terakzor/terakzor.toml usr/share/doc/terakzor/copyright "$service"; do
+    for required in usr/bin/terakzor etc/terakzor/terakzor.toml usr/share/doc/terakzor/copyright usr/share/doc/terakzor/THIRD_PARTY_NOTICES "$service"; do
         if ! contains_path "$package_paths" "$required"; then
             printf '%s is missing %s\n' "$package" "$required" >&2
             exit 1

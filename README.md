@@ -36,8 +36,10 @@ The dashboard is available by default at `http://127.0.0.1:3000/`.
 
 - `GET /` serves the dashboard.
 - `GET /api/metrics` returns metric samples from the last 24 hours.
+- `GET /assets/uplot-1.6.32/uPlot.min.css` serves the embedded chart stylesheet.
+- `GET /assets/uplot-1.6.32/uPlot.iife.min.js` serves the embedded chart script.
 
-The dashboard loads uPlot CSS and JavaScript from `unpkg.com`, so chart rendering requires network access to that host.
+The dashboard embeds and serves uPlot 1.6.32 locally, so chart rendering does not require external network access. See `THIRD_PARTY_NOTICES` for its MIT license notice.
 
 Example response:
 

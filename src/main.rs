@@ -6,7 +6,13 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use axum::{Json, Router, extract::State, response::Html, routing::get};
+use axum::{
+    Json, Router,
+    extract::State,
+    http::header,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+};
 use serde::{Deserialize, Serialize};
 use stoolap::Database;
 use sysinfo::{Disks, MINIMUM_CPU_UPDATE_INTERVAL, System};
@@ -27,6 +33,8 @@ const SUPPORTED_METRICS: [&str; 5] = [
     "uptime_seconds",
     "load_average_1m",
 ];
+const UPLOT_CSS: &str = include_str!("assets/uplot-1.6.32/uPlot.min.css");
+const UPLOT_JAVASCRIPT: &str = include_str!("assets/uplot-1.6.32/uPlot.iife.min.js");
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -486,16 +494,44 @@ fn app(database: Database) -> Router {
     Router::new()
         .route("/", get(index_handler))
         .route("/api/metrics", get(metrics_handler))
+        .route("/assets/uplot-1.6.32/uPlot.min.css", get(uplot_css_handler))
+        .route(
+            "/assets/uplot-1.6.32/uPlot.iife.min.js",
+            get(uplot_javascript_handler),
+        )
         .with_state(Arc::new(database))
 }
 
-async fn index_handler() -> Html<&'static str> {
-    Html(include_str!("index.html"))
+async fn index_handler() -> Response {
+    (
+        [(header::CACHE_CONTROL, "no-cache")],
+        Html(include_str!("index.html")),
+    )
+        .into_response()
+}
+
+async fn uplot_css_handler() -> Response {
+    static_asset(UPLOT_CSS, "text/css; charset=utf-8")
+}
+
+async fn uplot_javascript_handler() -> Response {
+    static_asset(UPLOT_JAVASCRIPT, "text/javascript; charset=utf-8")
+}
+
+fn static_asset(contents: &'static str, content_type: &'static str) -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, content_type),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        contents,
+    )
+        .into_response()
 }
 
 async fn metrics_handler(
     State(database): State<Arc<Database>>,
-) -> Result<Json<MetricsResponse>, (axum::http::StatusCode, String)> {
+) -> Result<impl IntoResponse, (axum::http::StatusCode, String)> {
     tokio::task::spawn_blocking(move || recent_metrics(&database))
         .await
         .map_err(|error| {
@@ -504,7 +540,7 @@ async fn metrics_handler(
                 format!("metrics query task failed: {error}"),
             )
         })?
-        .map(Json)
+        .map(|metrics| ([(header::CACHE_CONTROL, "no-store")], Json(metrics)))
         .map_err(|error| {
             (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -1434,10 +1470,48 @@ collection_interval_seconds = 15
             response.headers().get(header::CONTENT_TYPE).unwrap(),
             "application/json"
         );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-store"
+        );
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
         assert_eq!(body.as_ref(), br#"{"samples":[]}"#);
+    }
+
+    #[tokio::test]
+    async fn local_uplot_assets_have_versioned_cache_headers() {
+        let _lock = API_TEST_LOCK.lock().await;
+        for (path, content_type) in [
+            (
+                "/assets/uplot-1.6.32/uPlot.min.css",
+                "text/css; charset=utf-8",
+            ),
+            (
+                "/assets/uplot-1.6.32/uPlot.iife.min.js",
+                "text/javascript; charset=utf-8",
+            ),
+        ] {
+            let response = app(api_database())
+                .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers().get(header::CONTENT_TYPE).unwrap(),
+                content_type
+            );
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL).unwrap(),
+                "public, max-age=31536000, immutable"
+            );
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(!body.is_empty());
+        }
     }
 
     #[tokio::test]
@@ -1453,20 +1527,27 @@ collection_interval_seconds = 15
             response.headers().get(header::CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
         );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
         let page = String::from_utf8(body.to_vec()).unwrap();
 
-        assert!(page.contains("fetch(\"/api/metrics\")"));
+        assert!(page.contains("/assets/uplot-1.6.32/uPlot.min.css"));
+        assert!(page.contains("/assets/uplot-1.6.32/uPlot.iife.min.js"));
+        assert!(!page.contains("unpkg.com"));
+        assert!(page.contains("fetch(\"/api/metrics\","));
         assert!(page.contains("new uPlot"));
         assert!(page.contains("aria-live=\"polite\""));
         assert!(page.contains("ResizeObserver"));
         assert!(page.contains("chart-summary"));
-        assert!(page.contains("No telemetry has been collected"));
-        assert!(page.contains("latest[name] != null"));
-        assert!(page.contains("Object.entries(latest)"));
+        assert!(page.contains("No telemetry yet"));
         assert!(page.contains("metricDefinitions"));
+        assert!(page.contains("terakzor-theme"));
+        assert!(page.contains("plot.destroy"));
     }
 
     #[tokio::test]
