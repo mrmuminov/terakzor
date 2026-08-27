@@ -34,6 +34,9 @@ cargo run
 
 The dashboard is available by default at `http://localhost:6972/`.
 
+<img width="2329" height="1393" alt="image" src="https://github.com/user-attachments/assets/23218ad2-26e7-446e-8093-53f7e74e5cfe" />
+
+
 
 ## Model Context Protocol (MCP)
 
@@ -50,6 +53,8 @@ To test the MCP endpoint manually:
 ```bash
 curl -N -H "Authorization: Bearer $(grep mcp_token /etc/terakzor/terakzor.toml | cut -d'"' -f2)" http://localhost:6972/mcp/sse
 ```
+<img width="1387" height="913" alt="image" src="https://github.com/user-attachments/assets/8d876795-f375-4247-955a-d4fa5acf4788" />
+
 
 ## Dashboard and API
 
