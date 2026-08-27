@@ -115,7 +115,7 @@ jobs:
           path: dist/input
       - uses: secondlife/setup-nfpm@v5
         with:
-          version: latest
+          version: 2.47.0
       - name: Install package inspectors
         run: sudo apt-get update && sudo apt-get install --yes rpm
       - name: Build packages
