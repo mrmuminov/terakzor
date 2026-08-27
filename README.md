@@ -2,10 +2,12 @@
 
 Terakzor is a single-binary, local system metrics monitor written in Rust.
 
+
 ## Features
 
-- Collects CPU usage, RAM used, disk used, uptime, and one-minute load average.
-- Serves a local dashboard and JSON metrics API.
+- Collects CPU usage, RAM used, disk used, network interface traffic (RX/TX), swap usage, uptime, and load averages.
+- Provides a dynamic dashboard with a sidebar layout and categorized charts (Compute, Memory, Storage, Network, System).
+- Exposes a standard JSON metrics API and a Model Context Protocol (MCP) server for LLM agents.
 - Stores metrics locally with embedded Stoolap and no external database service.
 - Drains queued metrics during graceful shutdown before closing the database.
 
@@ -30,7 +32,24 @@ For development, run:
 cargo run
 ```
 
-The dashboard is available by default at `http://127.0.0.1:3000/`.
+The dashboard is available by default at `http://localhost:6972/`.
+
+
+## Model Context Protocol (MCP)
+
+Terakzor ships with an embedded MCP server over HTTP (SSE transport) designed for AI agents (like Claude Desktop). This allows LLMs to interactively read local system telemetry.
+
+- **Endpoint**: `GET /mcp/sse` (Agent opens an SSE stream, which redirects it to `POST /mcp/messages`).
+- **Authentication**: Requires an `Authorization: Bearer <TOKEN>` header. The token is generated automatically on first installation (for Linux packages) or can be manually set via `mcp_token` in `terakzor.toml`.
+- **Tools Provided**:
+  - `get_current_status`: Real-time system vitals.
+  - `get_historical_metrics`: Fetch recent history for any specific metric.
+  - `get_host_info`: OS, kernel, memory, and CPU core count.
+
+To test the MCP endpoint manually:
+```bash
+curl -N -H "Authorization: Bearer $(grep mcp_token /etc/terakzor/terakzor.toml | cut -d'"' -f2)" http://localhost:6972/mcp/sse
+```
 
 ## Dashboard and API
 
@@ -53,13 +72,13 @@ Each sample includes `timestamp` plus available enabled metric fields from `cpu_
 
 The sample configuration file is `terakzor.toml`.
 
-- `listen_address` defaults to `127.0.0.1:3000`.
+- `listen_address` defaults to `localhost:6972`.
 - `collection_interval_seconds` defaults to `60` and must be positive.
 - `retention_days` defaults to `7` and must be positive.
 - `[metrics]` enables or disables `cpu_percent`, `ram_used_bytes`, `disk_used_bytes`, `uptime_seconds`, and `load_average_1m`.
 
 ```toml
-listen_address = "127.0.0.1:3000"
+listen_address = "localhost:6972"
 collection_interval_seconds = 60
 retention_days = 7
 

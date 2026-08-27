@@ -1,5 +1,5 @@
-# Address the web UI listens on (default: "127.0.0.1:3000").
-listen_address = "127.0.0.1:3000"
+# Address the web UI listens on (default: "localhost:6972").
+listen_address = "localhost:6972"
 # Metrics older than this many days are deleted by a daily cleanup (default: 7).
 retention_days = 7
 collection_interval_seconds = 60
@@ -10,3 +10,7 @@ ram_used_bytes = true
 disk_used_bytes = true
 uptime_seconds = true
 load_average_1m = true
+
+# Authentication token for the MCP (Model Context Protocol) API
+# In production, this should be replaced with a secure random string.
+mcp_token = "dev-mcp-token-replace-me"

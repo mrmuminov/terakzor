@@ -22,53 +22,78 @@
   <style>
     :root {
       color-scheme: light;
-      --ground: #f4f5f0;
+      --ground: #f4f5f5;
       --panel: #ffffff;
-      --panel-muted: #ecefe9;
-      --line: #c8d0ca;
-      --text: #18211d;
-      --muted: #53615a;
-      --signal: #087a3d;
-      --warning: #986500;
-      --danger: #ad332e;
-      --focus: #125fc4;
-      --chart-grid: #dce2dc;
-      --chart-cpu: #087a3d;
-      --chart-ram: #39715f;
-      --chart-disk: #19708b;
-      --chart-uptime: #9a6800;
-      --chart-load: #985177;
+      --panel-muted: #f7f8f9;
+      --line: #dcdede;
+      --text: #202226;
+      --muted: #6e7687;
+      --signal: #37872d;
+      --warning: #ff780a;
+      --danger: #e02f44;
+      --focus: #3274d9;
+      --chart-grid: #e9edf2;
+      --chart-cpu: #3274d9;
+      --chart-ram: #73bf69;
+      --chart-disk: #ff9830;
+      --chart-uptime: #8f3bb8;
+      --chart-load: #f2cc0c;
+      --chart-load-5m: #e0b400;
+      --chart-load-15m: #cc9f00;
+      --chart-swap: #37872d;
+      --chart-rx: #5794f2;
+      --chart-tx: #f2495c;
     }
     :root[data-theme="dark"] {
       color-scheme: dark;
-      --ground: #111514;
-      --panel: #181e1c;
-      --panel-muted: #202824;
-      --line: #36403c;
-      --text: #e7eee9;
-      --muted: #aab5af;
-      --signal: #79e39d;
-      --warning: #e4ba74;
-      --danger: #ff9a91;
-      --focus: #9dc4ff;
-      --chart-grid: #28302d;
-      --chart-cpu: #79e39d;
-      --chart-ram: #9cbbb0;
-      --chart-disk: #74bad3;
-      --chart-uptime: #e4ba74;
-      --chart-load: #d69aca;
+      --ground: #111217;
+      --panel: #181b1f;
+      --panel-muted: #22252b;
+      --line: #2c3235;
+      --text: #c7d0d9;
+      --muted: #8e99a4;
+      --signal: #73bf69;
+      --warning: #ff9830;
+      --danger: #f2495c;
+      --focus: #5794f2;
+      --chart-grid: #303133;
+      --chart-cpu: #5794f2;
+      --chart-ram: #73bf69;
+      --chart-disk: #ff9830;
+      --chart-uptime: #b877d9;
+      --chart-load: #fade2a;
+      --chart-load-5m: #e6c517;
+      --chart-load-15m: #cca904;
+      --chart-swap: #37872d;
+      --chart-rx: #8ab8ff;
+      --chart-tx: #ff7383;
     }
     * { box-sizing: border-box; }
     html { background: var(--ground); }
-    body { min-width: 320px; margin: 0; overflow-x: hidden; background: var(--ground); color: var(--text); font-family: "IBM Plex Mono", "Courier New", ui-monospace, monospace; }
+    body { display: flex; flex-direction: column; min-height: 100vh; min-width: 320px; margin: 0; overflow-x: hidden; background: var(--ground); color: var(--text); font-family: "IBM Plex Mono", "Courier New", ui-monospace, monospace; }
     button { font: inherit; }
     .skip-link { position: fixed; z-index: 2; top: 12px; left: 12px; transform: translateY(-200%); padding: 10px 14px; background: var(--text); color: var(--ground); text-decoration: none; }
     .skip-link:focus { transform: translateY(0); }
-    main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 56px; }
-    .app-header { display: flex; align-items: end; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+    .app-layout { display: flex; min-height: 100vh; flex-direction: column; }
+    .sidebar { flex: 0 0 auto; border-bottom: 1px solid var(--line); padding: 16px 24px; display: flex; flex-direction: column; background: var(--panel); z-index: 10; }
+    .sidebar .logo { margin-bottom: 16px; font-size: 1.15rem; font-weight: bold; color: var(--text); display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .sidebar .logo span { font-weight: normal; color: var(--muted); font-size: 0.9rem; }
+    .sidebar .logo svg { height: 20px; fill: currentColor; }
+    .sidebar-nav { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .nav-item { padding: 8px 16px; border-radius: 4px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; transition: all 0.2s; }
+    .nav-item:hover { color: var(--text); background: var(--panel-muted); }
+    .nav-item.active { color: var(--focus); border-color: var(--focus); background: var(--panel-muted); }
+    main { flex: 1; min-width: 0; padding: 24px; }
+    @media (min-width: 768px) {
+      .app-layout { flex-direction: row; }
+      .sidebar { width: 260px; border-bottom: none; border-right: 1px solid var(--line); padding: 32px 24px; }
+      .sidebar .logo { margin-bottom: 32px; }
+      .sidebar-nav { flex-direction: column; overflow-x: visible; }
+      .nav-item { text-align: left; }
+    }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .eyebrow, .label, figcaption, .status, .state-kicker { margin: 0; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .13em; line-height: 1.35; text-transform: uppercase; }
-    h1 { max-width: 9ch; margin: 7px 0 0; font-size: clamp(2.25rem, 6vw, 4.75rem); letter-spacing: -.065em; line-height: .9; text-transform: uppercase; text-wrap: balance; }
-    .header-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 9px; }
+            .header-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 9px; }
     .status { display: flex; align-items: center; min-height: 44px; color: var(--signal); white-space: nowrap; }
     .status::before { content: ""; width: 8px; height: 8px; margin-right: 9px; border-radius: 50%; background: currentColor; }
     .status[data-kind="loading"] { color: var(--warning); }
@@ -82,16 +107,14 @@
     .state[data-tone="empty"] { border-left-color: var(--warning); }
     .state h2 { margin: 5px 0 0; font-size: 1rem; letter-spacing: -.03em; }
     .state p:not(.state-kicker) { max-width: 64ch; margin: 6px 0 0; color: var(--muted); font-size: .86rem; line-height: 1.5; }
-    .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; margin: 24px 0; border: 1px solid var(--line); background: var(--line); }
-    .readout { min-width: 0; min-height: 128px; padding: 18px; background: var(--panel); }
-    output { display: block; margin-top: 12px; color: var(--text); font-size: clamp(1.55rem, 4vw, 2.55rem); font-weight: 700; letter-spacing: -.075em; line-height: 1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; margin: 24px 0; border: 1px solid var(--line); background: var(--line); }
+    .readout { min-width: 0; min-height: 84px; padding: 12px 16px; background: var(--panel); }
+    output { display: block; margin-top: 6px; color: var(--text); font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; letter-spacing: -.075em; line-height: 1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .readout:first-child output { color: var(--signal); }
-    .readout-detail { margin: 11px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
     .placeholder { position: relative; overflow: hidden; color: transparent; }
     .placeholder::after { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 20%, color-mix(in srgb, var(--text) 8%, transparent) 45%, transparent 70%); content: ""; transform: translateX(-100%); animation: sweep 1.6s ease-in-out infinite; }
-    .placeholder .label, .placeholder output, .placeholder .readout-detail { color: transparent; border-radius: 2px; background: var(--panel-muted); }
+    .placeholder .label, .placeholder output { color: transparent; border-radius: 2px; background: var(--panel-muted); }
     .placeholder output { width: 68%; height: 2rem; }
-    .placeholder .readout-detail { width: 40%; height: .7rem; }
     .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .chart-panel { min-width: 0; margin: 0; border: 1px solid var(--line); background: var(--panel); padding: 18px; }
     .chart-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -103,7 +126,7 @@
     @keyframes sweep { to { transform: translateX(100%); } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; } }
     @media (max-width: 719px) {
-      main { width: min(100% - 32px, 1180px); padding-top: 22px; }
+      main { padding: 22px 16px 40px; }
       .app-header { align-items: start; flex-direction: column; }
       .header-controls { justify-content: start; }
       .chart-grid { grid-template-columns: 1fr; }
@@ -114,29 +137,36 @@
       .control { flex: 1; padding: 0 9px; }
       .state { grid-template-columns: 1fr; }
       .state .control { justify-self: start; }
-      .chart-panel, .readout, .state { padding: 15px; }
+      .chart-panel, .state { padding: 15px; }
+      .readout { padding: 10px 14px; min-height: 72px; }
     }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#dashboard">Skip to monitoring data</a>
-  <main id="dashboard" tabindex="-1">
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">Terakzor / Host telemetry</p>
-        <h1>Host Monitor</h1>
-      </div>
-      <div class="header-controls">
-        <span id="status" class="status" data-kind="loading" role="status" aria-live="polite">Loading telemetry</span>
-        <button id="retry" class="control" type="button">Refresh</button>
-        <button id="theme-toggle" class="control" type="button" aria-pressed="false">Dark mode</button>
-      </div>
-    </header>
-    <section id="state" class="state" aria-labelledby="state-title" hidden></section>
-    <section id="readouts" class="readouts" aria-label="Current measurements" aria-busy="true"></section>
-    <p id="chart-summary" class="sr-only">Loading telemetry.</p>
-    <section id="charts" class="chart-grid" aria-label="Metric history" hidden></section>
-  </main>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <a href="https://github.com/mrmuminov/terakzor" target="_blank" class="logo">
+        <svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        Terakzor <span>Host Telemetry</span>
+      </a>
+      <nav id="sidebar-nav" class="sidebar-nav" aria-label="Main Navigation"></nav>
+    </aside>
+    <main id="dashboard" tabindex="-1">
+      <header class="app-header">
+        <h2 id="category-title" style="margin:0; font-size:1.4rem;">Overview</h2>
+        <div class="header-controls">
+          <span id="status" class="status" data-kind="loading" role="status" aria-live="polite">Loading telemetry</span>
+          <button id="retry" class="control" type="button">Refresh</button>
+          <button id="theme-toggle" class="control" type="button" aria-pressed="false">Dark mode</button>
+        </div>
+      </header>
+      <section id="state" class="state" aria-labelledby="state-title" hidden></section>
+      <section id="readouts" class="readouts" aria-label="Current measurements" aria-busy="true"></section>
+      <p id="chart-summary" class="sr-only">Loading telemetry.</p>
+      <section id="charts" class="chart-grid" aria-label="Metric history" hidden></section>
+    </main>
+  </div>
   <script src="/assets/uplot-1.6.32/uPlot.iife.min.js"></script>
   <script>
     const status = document.querySelector("#status");
@@ -155,6 +185,9 @@
       disk_used_bytes: { label: "Disk used", chartLabel: "Disk bytes", format: bytes, stroke: "--chart-disk" },
       uptime_seconds: { label: "Uptime", chartLabel: "Uptime seconds", format: (value) => `${Math.floor(value / 3600)}h ${Math.floor(value % 3600 / 60)}m`, stroke: "--chart-uptime" },
       load_average_1m: { label: "Load average", chartLabel: "Load average (1m)", format: (value) => value.toFixed(2), stroke: "--chart-load" },
+      load_average_5m: { label: "Load average (5m)", chartLabel: "Load average (5m)", format: (value) => value.toFixed(2), stroke: "--chart-load-5m" },
+      load_average_15m: { label: "Load average (15m)", chartLabel: "Load average (15m)", format: (value) => value.toFixed(2), stroke: "--chart-load-15m" },
+      swap_used_bytes: { label: "Swap used", chartLabel: "Swap bytes", format: bytes, stroke: "--chart-swap" },
     };
     let plots = [];
     let resizeObserver;
@@ -236,6 +269,36 @@
     }
 
     function metricNames(samples) {
+      samples.forEach(sample => {
+        Object.keys(sample).forEach(key => {
+          if ((key.startsWith("network_rx_bytes_") || key.startsWith("network_tx_bytes_")) && !metricDefinitions[key]) {
+            const isRx = key.startsWith("network_rx_bytes_");
+            const iface = key.replace(isRx ? "network_rx_bytes_" : "network_tx_bytes_", "");
+            
+            metricDefinitions[key] = { 
+              label: `${isRx ? 'RX' : 'TX'} (${iface})`, 
+              chartLabel: `${isRx ? 'RX' : 'TX'} ${iface}`, 
+              format: bytes, 
+              stroke: isRx ? "--chart-rx" : "--chart-tx" 
+            };
+            
+            const groupId = "network_" + iface;
+            let netGroup = chartGroups.find(g => g.id === groupId);
+            if (!netGroup) {
+              netGroup = {
+                id: groupId,
+                category: "Network",
+                title: iface + " Traffic",
+                metrics: []
+              };
+              chartGroups.push(netGroup);
+            }
+            if (!netGroup.metrics.includes(key)) {
+              netGroup.metrics.push(key);
+            }
+          }
+        });
+      });
       return Object.keys(metricDefinitions).filter((name) => samples.some((sample) => sample[name] != null));
     }
 
@@ -255,7 +318,7 @@
       readoutsElement.replaceChildren(...Object.keys(metricDefinitions).map(() => {
         const readout = document.createElement("div");
         readout.className = "readout placeholder";
-        readout.innerHTML = '<span class="label">Loading</span><output>000</output><p class="readout-detail">Loading</p>';
+        readout.innerHTML = '<span class="label">Loading</span><output>000</output>';
         return readout;
       }));
       summary.textContent = "Loading telemetry.";
@@ -272,65 +335,134 @@
         label.textContent = definition.label;
         const output = document.createElement("output");
         output.textContent = valueFor(definition, latest[name]);
-        const detail = document.createElement("p");
-        detail.className = "readout-detail";
-        detail.textContent = latest[name] == null ? "Unavailable in latest sample" : "Latest sample";
-        readout.append(label, output, detail);
+        readout.append(label, output);
         return readout;
       }));
     }
 
-    function renderChart(metricName, samples, timestamps) {
-      const definition = metricDefinitions[metricName];
-      const latest = samples.at(-1)[metricName];
+    let activeCategory = "Compute";
+    const sidebarNav = document.querySelector("#sidebar-nav");
+    const categoryTitle = document.querySelector("#category-title");
+
+    const chartGroups = [
+      { id: "cpu", category: "Compute", title: "CPU percent", metrics: ["cpu_percent"] },
+      { id: "load", category: "Compute", title: "Load average", metrics: ["load_average_1m", "load_average_5m", "load_average_15m"] },
+      { id: "ram", category: "Memory", title: "RAM bytes", metrics: ["ram_used_bytes"] },
+      { id: "swap", category: "Memory", title: "Swap bytes", metrics: ["swap_used_bytes"] },
+      { id: "disk", category: "Storage", title: "Disk bytes", metrics: ["disk_used_bytes"] },
+      { id: "uptime", category: "System", title: "Uptime", metrics: ["uptime_seconds"] },
+    ];
+
+    function renderChartGroup(group, names, samples, timestamps) {
+      const activeMetrics = group.metrics.filter(m => names.includes(m));
+      if (activeMetrics.length === 0) return;
+      
+      const primaryDef = metricDefinitions[activeMetrics[0]];
+      const latestPrimary = samples.at(-1)[activeMetrics[0]];
+
       const panel = document.createElement("figure");
       panel.className = "chart-panel";
       const heading = document.createElement("div");
       heading.className = "chart-heading";
       const caption = document.createElement("figcaption");
-      caption.textContent = definition.chartLabel;
+      caption.textContent = group.title;
       const value = document.createElement("span");
       value.className = "chart-value";
-      value.textContent = valueFor(definition, latest);
+      
+      value.innerHTML = activeMetrics.map(m => {
+        const strokeColor = color(metricDefinitions[m].stroke);
+        const formatted = valueFor(metricDefinitions[m], samples.at(-1)[m]);
+        return "<span style=\"color: " + strokeColor + "\">" + formatted + "</span>";
+      }).join(" / ");
+      
       heading.append(caption, value);
       const target = document.createElement("div");
       target.className = "chart";
       const note = document.createElement("p");
       note.className = "chart-note";
-      note.textContent = `${samples.length} samples · Browser local time`;
+      note.textContent = samples.length + " samples \u00B7 Browser local time";
       panel.append(heading, target, note);
       chartsElement.append(panel);
-      createChart(target, definition, timestamps, samples.map((sample) => sample[metricName] ?? null));
-    }
+      
+      const seriesData = [timestamps];
+      const seriesConfig = [{}];
+      
+      activeMetrics.forEach(m => {
+        seriesData.push(samples.map(sample => sample[m] ?? null));
+        seriesConfig.push({ 
+          label: metricDefinitions[m].chartLabel, 
+          stroke: color(metricDefinitions[m].stroke), 
+          width: 2 
+        });
+      });
 
-    function createChart(target, definition, timestamps, measurements) {
       const plot = new uPlot({
         width: Math.max(target.clientWidth, 1),
         height: 240,
-        legend: { show: false },
-        series: [{}, { label: definition.chartLabel, stroke: color(definition.stroke), width: 2 }],
+        legend: { show: true, markers: { width: 2 } },
+        series: seriesConfig,
         axes: [
           { stroke: color("--muted"), grid: { stroke: color("--chart-grid") } },
-          { stroke: color("--muted"), grid: { stroke: color("--chart-grid") }, values: (_, ticks) => ticks.map((tick) => valueFor(definition, tick)) },
+          { stroke: color("--muted"), grid: { stroke: color("--chart-grid") }, values: (_, ticks) => ticks.map((tick) => valueFor(primaryDef, tick)) },
         ],
-      }, [timestamps, measurements], target);
+      }, seriesData, target);
+      
       plots.push({ plot, target });
     }
 
-    function renderDashboard(samples) {
-      const latest = samples.at(-1);
-      const names = metricNames(samples);
-      hideState();
-      renderReadouts(latest, names);
-      clearCharts();
-      const timestamps = samples.map((sample) => sample.timestamp);
-      names.forEach((name) => renderChart(name, samples, timestamps));
-      chartsElement.hidden = names.length === 0;
-      const timestamp = formattedTime(latest.timestamp);
-      setStatus(`Latest sample ${timestamp}`);
-      summary.textContent = `${names.map((name) => `${metricDefinitions[name].label} is ${valueFor(metricDefinitions[name], latest[name])}`).join("; ")}. ${samples.length} samples are displayed. Browser local time.`;
+    
+
+
+    function renderSidebar(availableCategories) {
+      if (!availableCategories.includes(activeCategory) && availableCategories.length > 0) {
+        activeCategory = availableCategories[0];
+      }
+      
+      categoryTitle.textContent = activeCategory;
+      sidebarNav.innerHTML = "";
+      
+      availableCategories.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.className = "nav-item" + (cat === activeCategory ? " active" : "");
+        btn.textContent = cat;
+        btn.onclick = () => {
+          activeCategory = cat;
+          if (currentSamples) {
+            renderDashboard(currentSamples);
+          }
+        };
+        sidebarNav.appendChild(btn);
+      });
     }
 
+    function renderDashboard(samples) {
+      const names = metricNames(samples);
+      
+      // Determine available categories based on active metrics
+      const availableCategories = [...new Set(
+        chartGroups.filter(g => g.metrics.some(m => names.includes(m))).map(g => g.category)
+      )];
+      
+      renderSidebar(availableCategories);
+      
+      hideState();
+      
+      // Filter names and groups for active category
+      const activeGroups = chartGroups.filter(g => g.category === activeCategory && g.metrics.some(m => names.includes(m)));
+      const activeNames = names.filter(name => activeGroups.some(g => g.metrics.includes(name)));
+      
+      renderReadouts(samples.at(-1), activeNames);
+      clearCharts();
+      
+      const timestamps = samples.map((sample) => sample.timestamp);
+      activeGroups.forEach((group) => renderChartGroup(group, names, samples, timestamps));
+      
+      chartsElement.hidden = activeGroups.length === 0;
+      const timestamp = formattedTime(samples.at(-1).timestamp);
+      setStatus(`Latest sample ${timestamp}`);
+      
+      summary.textContent = `${activeNames.map((name) => `${metricDefinitions[name].label} is ${valueFor(metricDefinitions[name], samples.at(-1)[name])}`).join("; ")}. ${samples.length} samples are displayed. Browser local time.`;
+    }
     function renderEmpty() {
       currentSamples = undefined;
       clearCharts();
