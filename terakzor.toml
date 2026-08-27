@@ -4,13 +4,13 @@ listen_address = "localhost:6972"
 retention_days = 7
 collection_interval_seconds = 60
 
+# Authentication token for the MCP (Model Context Protocol) API
+# In production, this should be replaced with a secure random string.
+mcp_token = "dev-mcp-token-replace-me"
+
 [metrics]
 cpu_percent = true
 ram_used_bytes = true
 disk_used_bytes = true
 uptime_seconds = true
 load_average_1m = true
-
-# Authentication token for the MCP (Model Context Protocol) API
-# In production, this should be replaced with a secure random string.
-mcp_token = "dev-mcp-token-replace-me"
