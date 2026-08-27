@@ -1,6 +1,6 @@
 use crate::config::{Config, MetricsConfig};
 use std::time::{SystemTime, UNIX_EPOCH};
-use sysinfo::{Disks, Networks, MINIMUM_CPU_UPDATE_INTERVAL, System};
+use sysinfo::{Disks, MINIMUM_CPU_UPDATE_INTERVAL, Networks, System};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -91,7 +91,6 @@ impl MetricSource for SysinfoMetricSource {
                 metric_name: "swap_used_bytes".to_owned(),
                 value: self.system.used_swap() as f64,
             },
-
         ];
 
         for (interface, data) in &self.networks {

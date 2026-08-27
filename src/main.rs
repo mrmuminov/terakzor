@@ -1,12 +1,12 @@
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 use stoolap::Database;
 use tokio::sync::mpsc;
 
 pub mod config;
 pub mod db;
-pub mod metrics;
 pub mod mcp;
+pub mod metrics;
 mod web;
 
 use crate::config::{
