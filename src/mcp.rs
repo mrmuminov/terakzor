@@ -1,14 +1,19 @@
 use axum::{
+    Json, Router,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::sse::{Event, Sse},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::{collections::HashMap, convert::Infallible, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
-use tokio::sync::{mpsc, RwLock};
+use serde_json::{Value, json};
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::sync::{RwLock, mpsc};
 use uuid::Uuid;
 
 use stoolap::Database;
@@ -60,14 +65,8 @@ pub fn router(db: Database, api_token: String) -> Router {
 }
 
 fn check_auth(headers: &HeaderMap, expected_token: &str) -> bool {
-    if let Some(auth_header) = headers.get("Authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str == format!("Bearer {}", expected_token) {
-                return true;
-            }
-        }
-    }
-    false
+    let expected = format!("Bearer {}", expected_token);
+    headers.get("Authorization").and_then(|h| h.to_str().ok()) == Some(&expected)
 }
 
 async fn sse_handler(
@@ -117,7 +116,8 @@ async fn message_handler(
     let response = handle_rpc_method(req, &state).await;
 
     if let Some(resp) = response {
-        if let Ok(resp_str) = serde_json::to_string(&resp) {
+        let resp_str = serde_json::to_string(&resp).unwrap_or_default();
+        if !resp_str.is_empty() {
             let _ = tx.send(resp_str).await;
         }
     }
@@ -232,7 +232,10 @@ async fn handle_rpc_method(req: JsonRpcRequest, state: &McpState) -> Option<Json
 }
 
 async fn execute_get_current_status(state: &McpState) -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
     let rows = match state.db.query(
         "SELECT metric_name, value FROM metrics WHERE timestamp >= $1",
         stoolap::params![now - 60],
@@ -241,17 +244,15 @@ async fn execute_get_current_status(state: &McpState) -> String {
         Err(_) => return "Database error".to_string(),
     };
 
-    let mut out = format!("Current System Status (collected within last minute):\n");
+    let mut out = "Current System Status (collected within last minute):\n".to_string();
     let mut count = 0;
-    for row in rows {
-        if let Ok(row) = row {
-            if let (Ok(name), Ok(value)) = (row.get::<String>(0), row.get::<f64>(1)) {
-                out.push_str(&format!("- {}: {}\n", name, value));
-                count += 1;
-            }
+    for row in rows.flatten() {
+        if let (Ok(name), Ok(value)) = (row.get::<String>(0), row.get::<f64>(1)) {
+            out.push_str(&format!("- {}: {}\n", name, value));
+            count += 1;
         }
     }
-    
+
     if count == 0 {
         return "No recent telemetry data available.".to_string();
     }
@@ -266,7 +267,10 @@ async fn execute_get_historical_metrics(args: &Value, state: &McpState) -> Strin
         return "Error: metric name is required.".to_string();
     }
 
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
     let start = now - (minutes * 60);
 
     let rows = match state.db.query(
@@ -278,26 +282,33 @@ async fn execute_get_historical_metrics(args: &Value, state: &McpState) -> Strin
     };
 
     let mut points = Vec::new();
-    for row in rows {
-        if let Ok(row) = row {
-            if let (Ok(ts), Ok(val)) = (row.get::<i64>(0), row.get::<f64>(1)) {
-                points.push(format!("  [{}] => {}", ts, val));
-            }
+    for row in rows.flatten() {
+        if let (Ok(ts), Ok(val)) = (row.get::<i64>(0), row.get::<f64>(1)) {
+            points.push(format!("  [{}] => {}", ts, val));
         }
     }
 
     if points.is_empty() {
-        return format!("No data found for metric '{}' in the last {} minutes.", metric, minutes);
+        return format!(
+            "No data found for metric '{}' in the last {} minutes.",
+            metric, minutes
+        );
     }
 
-    format!("Historical data for '{}' (last {} minutes, {} samples):\n{}", metric, minutes, points.len(), points.join("\n"))
+    format!(
+        "Historical data for '{}' (last {} minutes, {} samples):\n{}",
+        metric,
+        minutes,
+        points.len(),
+        points.join("\n")
+    )
 }
 
 fn execute_get_host_info() -> String {
     use sysinfo::System;
     let mut sys = System::new_all();
     sys.refresh_all();
-    
+
     format!(
         "Host Information:\n\
          - OS: {} {}\n\
@@ -306,7 +317,7 @@ fn execute_get_host_info() -> String {
          - CPU Cores: {}\n\
          - Total Memory: {} bytes",
         System::name().unwrap_or_else(|| "Unknown".to_string()),
-        System::os_version().unwrap_or_else(|| "".to_string()),
+        System::os_version().unwrap_or_default(),
         System::kernel_version().unwrap_or_else(|| "Unknown".to_string()),
         System::host_name().unwrap_or_else(|| "Unknown".to_string()),
         sys.cpus().len(),
